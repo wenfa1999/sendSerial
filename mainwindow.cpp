@@ -15,6 +15,8 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    this->setWindowTitle("串口接发工具");
+
     initActionConnections();
 
     initSerials();
@@ -28,6 +30,8 @@ MainWindow::MainWindow(QWidget *parent)
     ui->actionConnect->setEnabled(true);
     ui->disconnectBtn->setEnabled(false);
     ui->actionDisconnect->setEnabled(false);
+    ui->sendBtn->setEnabled(false);
+    ui->clearTextBtn->setEnabled(false);
 
     ui->statusbar->addWidget(m_status);
     ui->statusbar->addWidget(m_sendStatus);
@@ -45,9 +49,9 @@ MainWindow::MainWindow(QWidget *parent)
     /*
      * 测试
     */
-    ui->receiveBrowser->setText("慈母手中线，游子身上衣。"
-                                "临行密密缝，意恐迟迟归。"
-                                "谁言寸草心，报得三春晖。");
+//    ui->receiveBrowser->setText("慈母手中线，游子身上衣。"
+//                                "临行密密缝，意恐迟迟归。"
+//                                "谁言寸草心，报得三春晖。");
 
     connect(m_serial, &QSerialPort::readyRead, this, &MainWindow::receiveData);
 //    connect(m_serial, QOverload<Str>, this, &MainWindow::receiveData);
@@ -202,6 +206,8 @@ void MainWindow::openSerial()
         ui->disconnectBtn->setEnabled(true);
         ui->actionConnect->setEnabled(false);   //禁用连接按钮
         ui->connetcBtn->setEnabled(false);
+        ui->sendBtn->setEnabled(true);          //启用发送按钮
+        ui->clearTextBtn->setEnabled(true);     //启用清空文本按钮
 
         updateBoxStatus(false);
 
@@ -213,6 +219,8 @@ void MainWindow::openSerial()
     else
     {
         qDebug() << "打开串口失败！";
+        QMessageBox errorMsg(QMessageBox::Critical, "错误", "串口打开失败!\n原因：" + m_serial->errorString());
+        errorMsg.exec();
     }
 }
 
@@ -230,7 +238,8 @@ void MainWindow::closeSerial()
         ui->actionConnect->setEnabled(true);
         ui->disconnectBtn->setEnabled(false);
         ui->actionDisconnect->setEnabled(false);
-
+        ui->sendBtn->setEnabled(false);
+        ui->clearTextBtn->setEnabled(false);
         ui->textEdit->setEnabled(false);
 
         m_sendStatus->clear();
@@ -272,16 +281,38 @@ void MainWindow::receiveData()
     QByteArray recData = m_serial->readAll();
     QString recStr = recData.toHex();
 
-    qDebug() << "接收数据：";
-    QTextCodec *codec = QTextCodec::codecForName("utf-8");
+//    qDebug() << "接收数据：";
+//    QTextCodec *codecUtf8 = QTextCodec::codecForName("utf-8");
+//    QTextCodec *codecBig5 = QTextCodec::codecForName("Big5");
+//    QTextCodec *codecGB18030 = QTextCodec::codecForName("GB18030");
+//    qDebug() << "UTF-8：" << codecUtf8->toUnicode(recData);
 
+//    qDebug() << "Big5：" << codecBig5->toUnicode(recData);
+//    qDebug() << "GB18030：" << codecGB18030->toUnicode(recData);
 
-    ui->receiveBrowser->setText(recData.toHex());
+    QTextCodec *codec = nullptr;
+
+#ifdef Q_OS_WINDOWS
+    codec = QTextCodec::codecForName("GB18030");
+#else
+    codec = QTextCodec::codecForName("utf-8");
+#endif
+
+    QString finalStr = codec->toUnicode(recData);
+
+    qDebug() << codec->name() << ":" << finalStr;
+
+//    ui->receiveBrowser->setText(finalStr);
+    ui->receiveBrowser->append(finalStr);
 }
 
 // 点击发送按钮{槽函数}
 void MainWindow::on_sendBtn_clicked()
 {
+    if (!ui->textEdit->isEnabled())
+    {
+        this->m_status->setText("未连接！");
+    }
     QByteArray data = ui->textEdit->toPlainText().toLocal8Bit();
     qDebug() << "试图发送###";
     qDebug() << data;
